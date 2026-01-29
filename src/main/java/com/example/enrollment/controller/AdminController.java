@@ -13,6 +13,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import com.example.enrollment.entity.SubjectLog;
+import com.example.enrollment.repository.SubjectLogRepository;
 
 @Controller
 @RequestMapping("/admin") 
@@ -20,15 +22,18 @@ public class AdminController {
 
     private final StudentRepository studentRepository;
     private final PaymentRepository paymentRepository;
+    private final SubjectLogRepository subjectLogRepository;
     private final JdbcTemplate jdbcTemplate;
     private final FinancialService financialService;
 
     public AdminController(StudentRepository studentRepository, 
-                           PaymentRepository paymentRepository, 
+                           PaymentRepository paymentRepository,
+                           SubjectLogRepository subjectLogRepository,
                            JdbcTemplate jdbcTemplate,
                            FinancialService financialService) {
         this.studentRepository = studentRepository;
         this.paymentRepository = paymentRepository;
+        this.subjectLogRepository = subjectLogRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.financialService = financialService;
     }
@@ -85,24 +90,40 @@ public class AdminController {
 		
 	}
 
-	@PostMapping("/process-walkin")
+    @PostMapping("/process-walkin")
     public String processWalkInPayment(
-            @RequestParam("studentNumber") String studentNumber,
-  
+            // CHANGED: Renamed parameter to studentIdentifier to match the HTML form
+            @RequestParam("studentIdentifier") String studentIdentifier,
             @RequestParam("amount") Double amount,
             @RequestParam(value = "paymentType", defaultValue = "Cash") String paymentType, 
             RedirectAttributes redirectAttributes 
     ) {
-        Student student = studentRepository.findByStudentNumber(studentNumber.trim());
+        String trimmedId = studentIdentifier.trim();
+        
+        // LOGIC CHANGE: Search by Student Number first
+        Student student = studentRepository.findByStudentNumber(trimmedId);
+        
+        // If not found by Number, try searching by Last Name
         if (student == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Error: Student not found.");
+            // Assuming you have this method from your repository as seen in showWalkinPage
+            List<Student> results = studentRepository.findByLastNameContainingIgnoreCase(trimmedId);
+            if (!results.isEmpty()) {
+                student = results.get(0); // Select the first match found
+            }
+        }
+
+        // If still null, return error
+        if (student == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Error: Student not found with ID or Surname: " + trimmedId);
             return "redirect:/admin/walkin-payment";
         }
 
         Payment payment = new Payment();
         String transactionId = "WLK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(); 
         payment.setTransactionId(transactionId);
-        payment.setReferenceNumber(student.getStudentNumber());
+        
+        // Use the found student's actual ID for the record
+        payment.setReferenceNumber(student.getStudentNumber()); 
         payment.setAmount(amount);
         payment.setPaymentMethod(paymentType + " (Over the Counter)"); 
         payment.setPaymentDate(new Date());
@@ -114,9 +135,16 @@ public class AdminController {
             studentRepository.save(student);
         }
 
-        redirectAttributes.addFlashAttribute("successMessage", "Payment successful for " + student.getLastName());
+        redirectAttributes.addFlashAttribute("successMessage", "Payment successful for " + student.getLastName() + " (" + student.getStudentNumber() + ")");
         redirectAttributes.addFlashAttribute("transactionId", transactionId);
         
         return "redirect:/admin/walkin-payment";
+    }
+    
+    @GetMapping("/history-subject")
+    public String showSubjectHistory(Model model) {
+        List<SubjectLog> logs = subjectLogRepository.findAllByOrderByTimestampDesc();
+        model.addAttribute("logs", logs);
+        return "admin_history_subject";
     }
 }

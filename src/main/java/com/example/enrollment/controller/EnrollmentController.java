@@ -1,8 +1,10 @@
 package com.example.enrollment.controller;
 
 import com.example.enrollment.entity.Student;
+import com.example.enrollment.entity.SubjectLog; // IMPORT THIS
 import com.example.enrollment.repository.PaymentRepository;
 import com.example.enrollment.repository.StudentRepository;
+import com.example.enrollment.repository.SubjectLogRepository; // IMPORT THIS
 import com.example.enrollment.service.FinancialService;
 import com.example.enrollment.service.SchedulingService;
 
@@ -15,6 +17,7 @@ import org.springframework.web.bind.support.SessionStatus;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.security.Principal;
+import java.util.Date; // IMPORT THIS
 import java.util.List;
 import java.util.Map;
 
@@ -24,17 +27,20 @@ public class EnrollmentController {
 
     private final StudentRepository studentRepository;
     private final PaymentRepository paymentRepository;
+    private final SubjectLogRepository subjectLogRepository; // 1. ADD THIS REPO
     private final JdbcTemplate jdbcTemplate;
     private final FinancialService financialService;
     private final SchedulingService schedulingService;
 
     public EnrollmentController(StudentRepository studentRepository, 
                                 PaymentRepository paymentRepository,
+                                SubjectLogRepository subjectLogRepository, // 2. INJECT IT HERE
                                 JdbcTemplate jdbcTemplate,
                                 FinancialService financialService,
                                 SchedulingService schedulingService) {
         this.studentRepository = studentRepository;
         this.paymentRepository = paymentRepository;
+        this.subjectLogRepository = subjectLogRepository; // 3. INITIALIZE IT
         this.jdbcTemplate = jdbcTemplate;
         this.financialService = financialService;
         this.schedulingService = schedulingService;
@@ -114,7 +120,7 @@ public class EnrollmentController {
         String studentNum = s.getStudentNumber();
 
         try {
-            // 1. Duplicate Check (Explicit)
+            // 1. Duplicate Check
             Integer duplicate = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM student_enlistments WHERE student_id = ? AND course_id = ?",
                 Integer.class, studentId, courseId);
@@ -128,14 +134,13 @@ public class EnrollmentController {
                     "SELECT COALESCE(SUM(c.credit_units), 0) FROM student_enlistments se JOIN courses c ON se.course_id = c.course_id WHERE se.student_id = ?",
                     Integer.class, studentId);
 
-                // Fetch units of the subject being added
-                Integer newSubjectUnits = jdbcTemplate.queryForObject(
-                    "SELECT credit_units FROM courses WHERE course_id = ?", Integer.class, courseId);
+            Integer newSubjectUnits = jdbcTemplate.queryForObject(
+                "SELECT credit_units FROM courses WHERE course_id = ?", Integer.class, courseId);
 
-                if ((currentUnits + newSubjectUnits) > 24) {
-                    ra.addFlashAttribute("errorMessage", "Error: Maximum limit of 24 units reached. Current: " + currentUnits + " units.");
-                    return "redirect:/admin/cashier?keyword=" + studentNum;
-                }
+            if ((currentUnits + newSubjectUnits) > 24) {
+                ra.addFlashAttribute("errorMessage", "Error: Maximum limit of 24 units reached. Current: " + currentUnits + " units.");
+                return "redirect:/admin/cashier?keyword=" + studentNum;
+            }
 
             // 2. Capacity/Waitlist Check
             Integer sectionId = jdbcTemplate.queryForObject(
@@ -159,13 +164,25 @@ public class EnrollmentController {
             // 4. Perform Insert
             jdbcTemplate.update("INSERT INTO student_enlistments (student_id, course_id) VALUES (?, ?)", 
                                studentId, courseId);
+
+            // --- 5. LOGGING ADDED HERE (NEW) ---
+            Map<String, Object> courseInfo = jdbcTemplate.queryForMap("SELECT course_code, course_title FROM courses WHERE course_id = ?", courseId);
+            
+            SubjectLog log = new SubjectLog();
+            log.setStudentNumber(studentNum);
+            log.setAction("ADDED");
+            log.setCourseCode((String) courseInfo.get("course_code"));
+            log.setCourseTitle((String) courseInfo.get("course_title"));
+            log.setTimestamp(new Date());
+            log.setPerformedBy("Admin");
+            subjectLogRepository.save(log);
+            // -----------------------------------
+
             ra.addFlashAttribute("successMessage", "Subject added successfully!");
 
         } catch (IllegalStateException e) {
-            // Specifically catch the messages you throw
             ra.addFlashAttribute("errorMessage", e.getMessage());
         } catch (Exception e) {
-            // Catch unexpected database errors
             ra.addFlashAttribute("errorMessage", "An error occurred: " + e.getLocalizedMessage());
         }
         
@@ -175,7 +192,7 @@ public class EnrollmentController {
     @PostMapping("/admin/remove-subjects-bulk")
     @Transactional
     public String removeSubjectsBulk(
-            @RequestParam(value = "enlistmentIds", required = false) List<Long> ids, // Changed to Long
+            @RequestParam(value = "enlistmentIds", required = false) List<Long> ids,
             @RequestParam String studentNumber, 
             RedirectAttributes ra) {
 
@@ -186,15 +203,30 @@ public class EnrollmentController {
 
         try {
             for (Long id : ids) {
-                // Get courseId before deleting so we can check the waitlist
-                Integer cId = jdbcTemplate.queryForObject(
-                    "SELECT course_id FROM student_enlistments WHERE enlistment_id = ?", 
-                    Integer.class, id);
+                // Get courseId and info BEFORE deleting
+                Map<String, Object> info = jdbcTemplate.queryForMap(
+                    "SELECT se.course_id, c.course_code, c.course_title " +
+                    "FROM student_enlistments se " +
+                    "JOIN courses c ON se.course_id = c.course_id " +
+                    "WHERE se.enlistment_id = ?", id);
                 
+                Integer cId = (Integer) info.get("course_id");
+                
+                // --- LOGGING REMOVED HERE (NEW) ---
+                SubjectLog log = new SubjectLog();
+                log.setStudentNumber(studentNumber);
+                log.setAction("REMOVED");
+                log.setCourseCode((String) info.get("course_code"));
+                log.setCourseTitle((String) info.get("course_title"));
+                log.setTimestamp(new Date());
+                log.setPerformedBy("Admin");
+                subjectLogRepository.save(log);
+                // ----------------------------------
+
                 // Delete the enlistment record
                 jdbcTemplate.update("DELETE FROM student_enlistments WHERE enlistment_id = ?", id);
                 
-                // Trigger waitlist promotion for this specific course
+                // Trigger waitlist promotion
                 if (cId != null) {
                     schedulingService.promoteFromWaitlist(cId);
                 }
@@ -215,10 +247,13 @@ public class EnrollmentController {
             Student student = studentRepository.findByStudentNumber(studentNumber.trim());
             if (student != null) {
                 model.addAttribute("student", student);
-                calculateFinancials(student, model); // Calculates units and balance
+                calculateFinancials(student, model); 
+                financialService.populateStudentFinancialData(student, model);
                 
-                // ADD THIS LINE to populate the installments table
-                financialService.populateStudentFinancialData(student, model); 
+             // --- NEW CODE: Fetch Subject History for this student ---
+                List<SubjectLog> history = subjectLogRepository.findByStudentNumberOrderByTimestampDesc(student.getStudentNumber());
+                model.addAttribute("subjectHistory", history);
+                // --------------------------------------------------------
                 
                 return "account_status";
             }
@@ -269,11 +304,10 @@ public class EnrollmentController {
             "WHERE se.student_id = ? GROUP BY se.enlistment_id", student.getId());
         model.addAttribute("enlistedSubjects", enlisted);
 
-        // 3. FETCH PAYMENT HISTORY (The New Real-Time Part)
+        // 3. FETCH PAYMENT HISTORY
         List<Map<String, Object>> paymentHistory = jdbcTemplate.queryForList(
             "SELECT transaction_id, amount, payment_method, payment_date FROM payments WHERE reference_number = ? ORDER BY payment_date DESC",
             student.getStudentNumber());
         model.addAttribute("paymentHistory", paymentHistory);
     }
-    }
-
+}
