@@ -123,6 +123,19 @@ public class EnrollmentController {
                 ra.addFlashAttribute("errorMessage", "Error: This subject is already enlisted.");
                 return "redirect:/admin/cashier?keyword=" + studentNum;
             }
+            
+            Integer currentUnits = jdbcTemplate.queryForObject(
+                    "SELECT COALESCE(SUM(c.credit_units), 0) FROM student_enlistments se JOIN courses c ON se.course_id = c.course_id WHERE se.student_id = ?",
+                    Integer.class, studentId);
+
+                // Fetch units of the subject being added
+                Integer newSubjectUnits = jdbcTemplate.queryForObject(
+                    "SELECT credit_units FROM courses WHERE course_id = ?", Integer.class, courseId);
+
+                if ((currentUnits + newSubjectUnits) > 24) {
+                    ra.addFlashAttribute("errorMessage", "Error: Maximum limit of 24 units reached. Current: " + currentUnits + " units.");
+                    return "redirect:/admin/cashier?keyword=" + studentNum;
+                }
 
             // 2. Capacity/Waitlist Check
             Integer sectionId = jdbcTemplate.queryForObject(
@@ -233,7 +246,11 @@ public class EnrollmentController {
             "SELECT COALESCE(SUM(c.credit_units), 0) FROM student_enlistments se JOIN courses c ON se.course_id = c.course_id WHERE se.student_id = ?",
             Integer.class, student.getId());
         
-        double tuition = (totalUnits != null ? totalUnits : 0) * 1500.00;
+        int unitsToCharge = (totalUnits != null) ? totalUnits : 0;
+        if (unitsToCharge > 24) {
+            unitsToCharge = 24;
+        
+            double tuition = unitsToCharge * 1500.00;
         Double paymentsSum = paymentRepository.getTotalPaymentsByReferenceNumber(student.getStudentNumber());
         double totalPaid = (paymentsSum != null) ? paymentsSum : 0.00;
 
@@ -257,5 +274,6 @@ public class EnrollmentController {
             "SELECT transaction_id, amount, payment_method, payment_date FROM payments WHERE reference_number = ? ORDER BY payment_date DESC",
             student.getStudentNumber());
         model.addAttribute("paymentHistory", paymentHistory);
+    }
     }
 }
