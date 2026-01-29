@@ -104,7 +104,7 @@ public class AdminController {
         payment.setTransactionId(transactionId);
         payment.setReferenceNumber(student.getStudentNumber());
         payment.setAmount(amount);
-        payment.setPaymentMethod(paymentType + " (Walk-in)"); 
+        payment.setPaymentMethod(paymentType + " (Over the Counter)"); 
         payment.setPaymentDate(new Date());
         payment.setStatus("COMPLETED");
         paymentRepository.save(payment);
