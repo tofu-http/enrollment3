@@ -56,13 +56,14 @@
                 <div class="card-body" style="padding: 30px;">
                     <form action="/admin/process-walkin" method="POST">
                         
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                            <div>
-                                <label class="info-label">Student Number</label>
-                                <input type="text" name="studentNumber" class="search-input" style="width:100%;" placeholder="e.g. 22-2-01775" required>
-								
-                            </div>
-                        </div>
+						<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+						    <div>
+						        <label class="info-label">Student Number or Surname</label>
+						        
+						        <input type="text" name="studentIdentifier" class="search-input" style="width:100%;" 
+						               placeholder="e.g. 22-2-01775 or Dela Cruz" required>
+						    </div>
+						</div>
 
                         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 25px;">
                             <label class="info-label" style="text-align: center; display: block; margin-bottom: 10px;">Amount Received (PHP)</label>

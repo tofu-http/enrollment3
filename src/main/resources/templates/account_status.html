@@ -152,6 +152,57 @@
 			        </div>
 			    </details>
 			</div>
+			
+			<div class="card" style="margin-top: 25px;">
+			    <details>
+			        <summary class="card-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; list-style: none; outline: none;">
+			            <div style="display: flex; align-items: center; gap: 10px;">
+			                <i class="fas fa-clipboard-list" style="color: #800000;"></i>
+			                <h3 style="margin: 0; color: #800000; font-size: 1.17em;">Subject Enlistment History</h3>
+			            </div>
+			            <i class="fas fa-chevron-down" style="color: #777;"></i>
+			        </summary>
+			        
+			        <div class="card-body" style="padding: 0; border-top: 1px solid #eee;">
+			            <table class="modern-table" style="width: 100%; border-collapse: collapse;">
+			                
+			                <thead style="background: #800000;">
+			                    <tr>
+			                        <th style="padding: 15px; text-align: left; font-size: 0.85rem; color: white; border-bottom: 1px solid #eee;">Date & Time</th>
+			                        <th style="padding: 15px; text-align: center; font-size: 0.85rem; color: white; border-bottom: 1px solid #eee;">Action</th>
+			                        <th style="padding: 15px; text-align: left; font-size: 0.85rem; color: white; border-bottom: 1px solid #eee;">Subject Details</th>
+			                    </tr>
+			                </thead>
+			                <tbody>
+			                    <tr th:each="log : ${subjectHistory}" style="border-bottom: 1px solid #eee;">
+			                        <td style="padding: 15px; font-size: 0.9rem; color: #333;" 
+			                            th:text="${#dates.format(log.timestamp, 'MMM dd, yyyy hh:mm a')}">
+			                        </td>
+			                        
+			                        <td style="padding: 15px; text-align: center;">
+			                            <span th:text="${log.action}"
+			                                  th:style="${log.action == 'ADDED' ? 
+			                                  'background: #d4edda; color: #155724; padding: 5px 10px; border-radius: 15px; font-size: 0.75rem; font-weight: bold; letter-spacing: 0.5px;' : 
+			                                  'background: #f8d7da; color: #721c24; padding: 5px 10px; border-radius: 15px; font-size: 0.75rem; font-weight: bold; letter-spacing: 0.5px;'}">
+			                            </span>
+			                        </td>
+			                        
+			                        <td style="padding: 15px;">
+			                            <div style="font-weight: bold; font-size: 0.95rem; color: #333;" th:text="${log.courseCode}"></div>
+			                            <div style="font-size: 0.85rem; color: #666; margin-top: 2px;" th:text="${log.courseTitle}"></div>
+			                        </td>
+			                    </tr>
+			                    
+			                    <tr th:if="${#lists.isEmpty(subjectHistory)}">
+			                        <td colspan="3" style="text-align: center; padding: 30px; color: #999; font-style: italic;">
+			                            <i class="fas fa-info-circle" style="margin-right: 5px;"></i> No subject changes recorded yet.
+			                        </td>
+			                    </tr>
+			                </tbody>
+			            </table>
+			        </div>
+			    </details>
+			</div>
     </main>
 </div>
 </body>
