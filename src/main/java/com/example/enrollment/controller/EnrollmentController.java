@@ -249,7 +249,7 @@ public class EnrollmentController {
         int unitsToCharge = (totalUnits != null) ? totalUnits : 0;
         if (unitsToCharge > 24) {
             unitsToCharge = 24;
-        
+        }
             double tuition = unitsToCharge * 1500.00;
         Double paymentsSum = paymentRepository.getTotalPaymentsByReferenceNumber(student.getStudentNumber());
         double totalPaid = (paymentsSum != null) ? paymentsSum : 0.00;
@@ -276,4 +276,4 @@ public class EnrollmentController {
         model.addAttribute("paymentHistory", paymentHistory);
     }
     }
-}
+
