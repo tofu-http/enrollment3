@@ -113,7 +113,7 @@
                     <div class="card-header"><i class="fas fa-calculator"></i> <h3>Current Assessment Breakdown</h3></div>
                     <div class="fee-list" style="padding: 20px;">
                         <div class="fee-item">
-                            <span>Tuition Fee (<span th:text="${totalUnits}">0</span> Units)</span>
+                            <span>Tuition Fee (<span th:text="${totalUnits}">0</span> Units <th:block th:if="${totalUnits > 24}">- Capped at 24</th:block>)</span>
                             <span th:text="${#numbers.formatDecimal(tuitionTotal, 1, 'COMMA', 2, 'POINT')}"></span>
                         </div>
 
