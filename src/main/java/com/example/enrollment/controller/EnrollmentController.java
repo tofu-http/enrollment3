@@ -190,7 +190,7 @@ public class EnrollmentController {
     }
 
     @PostMapping("/admin/remove-subjects-bulk")
-    @Transactional
+    @Transactional // This now handles the rollback correctly
     public String removeSubjectsBulk(
             @RequestParam(value = "enlistmentIds", required = false) List<Long> ids,
             @RequestParam String studentNumber, 
@@ -201,18 +201,24 @@ public class EnrollmentController {
             return "redirect:/admin/cashier?keyword=" + studentNumber;
         }
 
-        try {
-            for (Long id : ids) {
-                // Get courseId and info BEFORE deleting
-                Map<String, Object> info = jdbcTemplate.queryForMap(
-                    "SELECT se.course_id, c.course_code, c.course_title " +
-                    "FROM student_enlistments se " +
-                    "JOIN courses c ON se.course_id = c.course_id " +
-                    "WHERE se.enlistment_id = ?", id);
+        // Notice: We removed the try-catch that was swallowing the error
+        for (Long id : ids) {
+            // 1. Use queryForList instead of queryForMap to avoid an exception if nothing is found
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                "SELECT se.course_id, c.course_code, c.course_title " +
+                "FROM student_enlistments se " +
+                "JOIN courses c ON se.course_id = c.course_id " +
+                "WHERE se.enlistment_id = ?", id);
+            
+            // 2. Only proceed if we actually found a record
+            if (!results.isEmpty()) {
+                Map<String, Object> info = results.get(0);
                 
-                Integer cId = (Integer) info.get("course_id");
+                // Use a safer check for the ID
+                Object rawId = info.get("course_id");
+                Integer cId = (rawId != null) ? ((Number) rawId).intValue() : null;
                 
-                // --- LOGGING REMOVED HERE (NEW) ---
+                // Log the action
                 SubjectLog log = new SubjectLog();
                 log.setStudentNumber(studentNumber);
                 log.setAction("REMOVED");
@@ -221,24 +227,19 @@ public class EnrollmentController {
                 log.setTimestamp(new Date());
                 log.setPerformedBy("Admin");
                 subjectLogRepository.save(log);
-                // ----------------------------------
 
-                // Delete the enlistment record
+                // 3. Delete and Promote
                 jdbcTemplate.update("DELETE FROM student_enlistments WHERE enlistment_id = ?", id);
                 
-                // Trigger waitlist promotion
                 if (cId != null) {
                     schedulingService.promoteFromWaitlist(cId);
                 }
             }
-            ra.addFlashAttribute("successMessage", "Successfully removed selected subjects and updated waitlists.");
-        } catch (Exception e) {
-            ra.addFlashAttribute("errorMessage", "Error during removal: " + e.getMessage());
         }
-
+        
+        ra.addFlashAttribute("successMessage", "Successfully removed selected subjects.");
         return "redirect:/admin/cashier?keyword=" + studentNumber;
     }
-
     // --- STUDENT SELF-SERVICE ---
 
     @GetMapping("/account_status")
