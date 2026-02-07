@@ -42,17 +42,19 @@ public class SecurityConfig {
     @Bean
     public AuthenticationSuccessHandler roleBasedSuccessHandler() {
         return (request, response, authentication) -> {
-            var roles = authentication.getAuthorities();
-            
-            // Logic to check the role of the person logging in
-            boolean isAdmin = roles.stream()
-                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+            var roles = authentication.getAuthorities().stream()
+                    .map(auth -> auth.getAuthority())
+                    .toList();
 
-            if (isAdmin) {
+            if (roles.contains("ROLE_ADMIN")) {
                 response.sendRedirect("/admin/dashboard");
+            } else if (roles.contains("ROLE_CASHIER")) {
+                // Redirect Cashier to their specific starting point
+                response.sendRedirect("/admin/walkin-payment"); 
+            } else if (roles.contains("ROLE_FACULTY")) {
+                response.sendRedirect("/admin/cashier");
             } else {
-                // For students/regular users
-                response.sendRedirect("/index");
+                response.sendRedirect("/index"); // Students
             }
         };
     }
