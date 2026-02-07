@@ -12,13 +12,26 @@
             <img th:src="@{/images/emblem.png}" alt="EAC Logo" class="sidebar-logo">
             <h3>STUDENT PORTAL</h3>
         </div>
-        <nav class="nav-menu">
-            <a th:href="@{/index}" class="nav-item"><i class="fas fa-home"></i> Home</a>
-            <a th:href="@{/account_status}" class="nav-item active"><i class="fas fa-file-invoice-dollar"></i> My Ledger</a>
-            <a th:href="@{/status}" class="nav-item"><i class="fas fa-tasks"></i> Application Status</a>
-            <div class="nav-divider"></div>
-            <a th:href="@{/logout}" class="nav-item logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
-        </nav>
+		<nav class="nav-menu">
+		    <a th:href="@{/admin/dashboard}" class="nav-item" sec:authorize="hasRole('ADMIN')">
+		        <i class="fas fa-chart-line"></i> Dashboard
+		    </a>
+
+		    <a th:href="@{/admin/cashier}" class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'CASHIER')">
+		        <i class="fas fa-file-invoice-dollar"></i> Student Ledger
+		    </a>
+
+		    <a th:href="@{/admin/walkin-payment}" class="nav-item active">
+		        <i class="fas fa-cash-register"></i> Process Payment
+		    </a>
+
+		    <a th:href="@{/admin/history-subject}" class="nav-item" sec:authorize="hasRole('ADMIN')">
+		        <i class="fas fa-history"></i> Subject Logs
+		    </a>
+
+		    <div class="nav-divider"></div>
+		    <a th:href="@{/logout}" class="nav-item logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+		</nav>
     </aside>
 
     <main class="main-content">
@@ -114,6 +127,11 @@
 			                    </tr>
 			                </tbody>
 			            </table>
+						<div class="fee-item total" style="background: #fdf2f2; padding: 15px; border-top: 2px solid #800000; display: flex; justify-content: space-between; align-items: center;">
+										            <span style="color: #800000; font-weight: bold; letter-spacing: 1px;">TOTAL OUTSTANDING BALANCE</span>
+										            <span style="color: #800000; font-size: 1.4rem; font-weight: 800;" 
+										                  th:text="'₱ ' + ${#numbers.formatDecimal(outstandingBalance, 1, 'COMMA', 2, 'POINT')}"></span>
+										        </div>
 			        </div>
 			    </div>
 			</div>
