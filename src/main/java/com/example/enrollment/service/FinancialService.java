@@ -23,7 +23,7 @@ public class FinancialService {
     }
 
     public void populateStudentFinancialData(Student student, Model model) {
-        // 1. Fetch total units from database
+        // 1. Fetch total units
         Integer totalUnitsFromDb = jdbcTemplate.queryForObject(
             "SELECT COALESCE(SUM(c.credit_units), 0) FROM student_enlistments se " +
             "JOIN courses c ON se.course_id = c.course_id WHERE se.student_id = ?",
@@ -31,9 +31,12 @@ public class FinancialService {
         
         int totalUnits = (totalUnitsFromDb != null) ? totalUnitsFromDb : 0;
         
+        // --- ADDED: 24-UNIT CAP LOGIC ---
+        int unitsToCharge = Math.min(totalUnits, 24); 
+        
         // 2. Fees Calculation
         double ratePerUnit = 1500.00;
-        double tuitionFee = totalUnits * ratePerUnit;
+        double tuitionFee = unitsToCharge * ratePerUnit; // Capped tuition
 
         double miscTotal = 7431.00;
         double otherFeesTotal = 18562.00;
@@ -46,14 +49,13 @@ public class FinancialService {
         double totalPaid = (paymentsFromDb != null) ? paymentsFromDb : 0.00;
         double outstandingBalance = totalAssessment - totalPaid;
 
-        // 5. PAYMENT DETAILS LOGIC - UPDATED TO 2026
+        // 5. INSTALLMENT LOGIC (8 Installments)
         double downpaymentFixed = 3000.00;
         double remainingForInstallments = totalAssessment - downpaymentFixed;
         
         List<Map<String, Object>> installmentSchedule = new ArrayList<>();
         double installmentAmount = (remainingForInstallments > 0) ? (remainingForInstallments / 8) : 0;
 
-        // Updated dates for 2026 academic calendar
         String[] dueDates = {
             "Aug. 30, 2026", "Sep. 15, 2026", "Sep. 30, 2026", "Oct. 15, 2026", 
             "Oct. 30, 2026", "Nov. 15, 2026", "Nov. 30, 2026", "Dec. 10, 2026"
@@ -69,14 +71,17 @@ public class FinancialService {
             installment.put("dueDate", dueDates[i]);
             installment.put("amount", installmentAmount);
             
-            // Logic to determine PAID status based on total payments made
+            // The threshold increases with each installment
             double threshold = downpaymentFixed + (installmentAmount * (i + 1));
-            installment.put("status", totalPaid >= threshold ? "PAID" : "UNPAID");
+            
+            // Precision fix: using -0.01 to handle small rounding differences in double math
+            installment.put("status", totalPaid >= (threshold - 0.01) ? "PAID" : "UNPAID");
             installmentSchedule.add(installment);
         }
 
         // 6. Populate Model
-        model.addAttribute("totalUnits", totalUnits);
+        model.addAttribute("totalUnits", totalUnits); // Show actual load
+        model.addAttribute("unitsCharged", unitsToCharge); // Show capped units
         model.addAttribute("tuitionTotal", tuitionFee);
         model.addAttribute("totalAssessment", totalAssessment);
         model.addAttribute("totalOnlinePayments", totalPaid);
@@ -86,8 +91,7 @@ public class FinancialService {
         model.addAttribute("downpaymentStatus", totalPaid >= downpaymentFixed ? "PAID" : "UNPAID");
         model.addAttribute("installments", installmentSchedule);
 
-        // 7. Enlisted Subjects
-     // FinancialService.java - Updated Subject Enlistment Query
+        // 7. Enlisted Subjects Query
         List<Map<String, Object>> enlistedSubjects = jdbcTemplate.queryForList(
             "SELECT se.enlistment_id, c.course_code, c.course_title, c.credit_units, " +
             "GROUP_CONCAT(CONCAT(" +
@@ -105,7 +109,13 @@ public class FinancialService {
             "GROUP BY se.enlistment_id, c.course_code, c.course_title, c.credit_units", 
             student.getId());
 
-        	model.addAttribute("enlistedSubjects", enlistedSubjects);
-        model.addAttribute("allCourses", jdbcTemplate.queryForList("SELECT * FROM courses WHERE active_status = 1"));
+        model.addAttribute("enlistedSubjects", enlistedSubjects);
+        
+        // Fetch payment history for the transaction table
+        List<Map<String, Object>> paymentHistory = jdbcTemplate.queryForList(
+            "SELECT transaction_id, amount, payment_method, payment_date FROM payments " +
+            "WHERE reference_number = ? ORDER BY payment_date DESC",
+            student.getStudentNumber());
+        model.addAttribute("paymentHistory", paymentHistory);
     }
 }
