@@ -21,11 +21,16 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("User not found");
         }
         
+     // LOGIC FIX: Ensure the role always starts with "ROLE_"
+        String roleName = user.getRole();
+        if (!roleName.startsWith("ROLE_")) {
+            roleName = "ROLE_" + roleName;
+        }
         // Convert our DB User to Spring Security User
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getUsername())
                 .password(user.getPassword())
-                .authorities(user.getRole()) // Automatically prefixes with ROLE_
+                .authorities(roleName) // Automatically prefixes with ROLE_
                 .build();
     }
 }
