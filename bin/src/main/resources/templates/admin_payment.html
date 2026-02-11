@@ -20,13 +20,26 @@
             <img th:src="@{/images/emblem.png}" alt="EAC Logo" class="sidebar-logo">
             <h3>EAC CASHIER</h3>
         </div>
-        <nav class="nav-menu">
-            <a th:href="@{/admin/dashboard}" class="nav-item"><i class="fas fa-chart-line"></i> Dashboard</a>
-            <a th:href="@{/admin/cashier}" class="nav-item active"><i class="fas fa-file-invoice-dollar"></i> Student Ledger</a>
-            <a th:href="@{/admin/walkin-payment}" class="nav-item"><i class="fas fa-cash-register"></i> Process Payment</a>
-            <div class="nav-divider"></div>
-            <a th:href="@{/logout}" class="nav-item logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
-        </nav>
+		<nav class="nav-menu">
+		    <a th:href="@{/admin/dashboard}" class="nav-item" sec:authorize="hasRole('ADMIN')">
+		        <i class="fas fa-chart-line"></i> Dashboard
+		    </a>
+
+		    <a th:href="@{/admin/cashier}" class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'CASHIER')">
+		        <i class="fas fa-file-invoice-dollar"></i> Student Ledger
+		    </a>
+
+		    <a th:href="@{/admin/walkin-payment}" class="nav-item active">
+		        <i class="fas fa-cash-register"></i> Process Payment
+		    </a>
+
+		    <a th:href="@{/admin/history-subject}" class="nav-item" sec:authorize="hasRole('ADMIN')">
+		        <i class="fas fa-history"></i> Subject Logs
+		    </a>
+
+		    <div class="nav-divider"></div>
+		    <a th:href="@{/logout}" class="nav-item logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+		</nav>
     </aside>
 
     <main class="main-content">
@@ -148,43 +161,49 @@
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header"><i class="fas fa-calendar-alt"></i> <h3>Payment Schedule & Status</h3></div>
-                    <div class="card-body" style="padding: 0;">
-                        <table class="modern-table">
-                            <thead style="background-color: #f4f4f4;">
-                                <tr>
-                                    <th>Installment</th>
-                                    <th style="text-align: right;">Amount Due</th>
-                                    <th style="text-align: center;">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-								
-								<td style="padding: 12px;">Downpayment</td>
+				<div class="card">
+				    <div class="card-header"><i class="fas fa-calendar-alt"></i> <h3>Payment Schedule & Status</h3></div>
+				    <div class="card-body" style="padding: 0;">
+				        <table class="modern-table" style="margin-bottom: 0; border-bottom: none;">
+				            <thead style="background-color: #f4f4f4;">
+				                <tr>
+				                    <th style="padding: 12px;">Installment</th>
+				                    <th style="text-align: right; padding: 12px;">Amount Due</th>
+				                    <th style="text-align: center; padding: 12px;">Status</th>
+				                </tr>
+				            </thead>
+				            <tbody>
+				                <tr>
+				                    <td style="padding: 12px;">Downpayment</td>
+				                    <td style="text-align: right; padding: 12px; font-weight: bold;" 
+				                        th:text="${#numbers.formatDecimal(downpaymentAmount, 1, 'COMMA', 2, 'POINT')}">3,000.00</td>
+				                    <td style="text-align: center; padding: 12px;">
+				                        <span th:text="${downpaymentStatus}" 
+				                              th:style="${downpaymentStatus == 'PAID' ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;'}"></span>
+				                    </td>
+				                </tr>
 
-								<td style="text-align: right; padding: 12px; font-weight: bold;" th:text="${#numbers.formatDecimal(downpaymentAmount, 1, 'COMMA', 2, 'POINT')}">3,000.00</td>
+				                <tr th:each="inst : ${installments}">
+				                    <td th:text="${inst.label}" style="padding: 12px;"></td>
+				                    <td style="text-align: right; padding: 12px; font-weight: bold;" 
+				                        th:text="${#numbers.formatDecimal(inst.amount, 1, 'COMMA', 2, 'POINT')}"></td>
+				                    <td style="text-align: center; padding: 12px;">
+				                        <span th:text="${inst.status}" 
+				                              th:style="${inst.status == 'PAID' ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;'}"></span>
+				                    </td>
+				                </tr>
+				            </tbody>
+				        </table>
 
-								<td style="text-align: center; padding: 12px;">
+				        <div class="fee-item total" style="background: #fdf2f2; padding: 15px; border-top: 2px solid #800000; display: flex; justify-content: space-between; align-items: center;">
+				            <span style="color: #800000; font-weight: bold; letter-spacing: 1px;">TOTAL OUTSTANDING BALANCE</span>
+				            <span style="color: #800000; font-size: 1.4rem; font-weight: 800;" 
+				                  th:text="'₱ ' + ${#numbers.formatDecimal(outstandingBalance, 1, 'COMMA', 2, 'POINT')}"></span>
+				        </div>
+				    </div>
+				</div>
 
-								<span th:text="${downpaymentStatus}" th:style="${downpaymentStatus == 'PAID' ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;'}"></span>
-
-								</td>
-
-                                <tr th:each="inst : ${installments}">
-                                    <td th:text="${inst.label}"></td>
-                                    <td style="text-align: right; font-weight: bold;" th:text="${#numbers.formatDecimal(inst.amount, 1, 'COMMA', 2, 'POINT')}"></td>
-                                    <td style="text-align: center;">
-                                        <span th:text="${inst.status}" th:style="${inst.status == 'PAID' ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;'}"></span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card" style="margin-top: 25px;">
+            <div class="card" style="margin-top: 15px;">
                 <details>
                     <summary class="card-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; list-style: none;">
                         <div><i class="fas fa-history"></i> <h3 style="display: inline; margin-left: 10px;">Transaction History</h3></div>
